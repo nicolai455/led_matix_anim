@@ -6,5 +6,12 @@
   "serpentine": [true, true, true, true],
   "startCorner": 0,
   "panelLayout": 1,
-  "panelSerpentine": true
+  "panelSerpentine": true,
+  "defaultAnimation": "Rainbow",
+  "autoCycleMs": 0,
+  "fsAnimationPath": "/animations/example.lfx",
+  "ledDataPin": 8,
+  "ledBrightness": 128,
+  "ledType": "WS2812B",
+  "ledColorOrder": "GRB"
 }

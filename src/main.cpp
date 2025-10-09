@@ -2,13 +2,17 @@
 #include <FastLED.h>
 #include "MatrixOrientation.h"
 #include "ConfigManager.h"
+#include "AnimationManager.h"
+#include "animations/TestPatternAnimation.h"
+#include "animations/RainbowAnimation.h"
+#include "animations/SolidColorAnimation.h"
+#include "animations/FrameAnimation.h"
+#include "frame_io/ProgmemFrameSource.h"
+#include "frame_io/FsFrameSource.h"
 
 // LED Matrix Configuration - 4x 16x16 panels → 32x32 total
-#define DATA_PIN 8
-#define LED_TYPE WS2812B
-#define COLOR_ORDER GRB
-#define BRIGHTNESS 64
-#define LOOP_DELAY_MS 1000
+// Hardware settings are now loaded from config file
+#define TOTAL_LEDS 1024  // 4 panels × 16×16 = 1024 LEDs
 
 // LED array - 4 panels of 16x16 = 1024 LEDs
 CRGB leds[1024];
@@ -19,11 +23,17 @@ MatrixOrientation matrix;
 // Configuration manager
 ConfigManager configManager;
 
+// Animation manager
+AnimationManager animManager;
+
 // Function to disable the onboard LED
 void disableOnboardLED() {
   Serial.println("Disabling onboard LED...");
-  pinMode(97, OUTPUT);
-  digitalWrite(97, LOW);
+  
+  // ESP32-S3 onboard LED is typically on GPIO 48 (built-in LED)
+  pinMode(48, OUTPUT);
+  digitalWrite(48, LOW);
+  
   Serial.println("Onboard LED disabled");
 }
 
@@ -48,48 +58,38 @@ void setupHardware() {
 
 // Function to initialize the LED matrix
 void initializeLEDMatrix() {
-  const uint16_t numLeds = 1024; // 4 panels × 16×16 = 1024 LEDs
-
   Serial.println("Initializing LED matrix...");
-  Serial.printf("Number of LEDs: %u\n", numLeds);
+  Serial.printf("Number of LEDs: %u\n", TOTAL_LEDS);
+  
+  // Get hardware settings from config
+  uint8_t dataPin = configManager.getLedDataPin();
+  uint8_t brightness = configManager.getLedBrightness();
+  String ledType = configManager.getLedType();
+  String colorOrder = configManager.getLedColorOrder();
+  
+  Serial.printf("Data Pin: %d\n", dataPin);
+  Serial.printf("Brightness: %d\n", brightness);
+  Serial.printf("LED Type: %s\n", ledType.c_str());
+  Serial.printf("Color Order: %s\n", colorOrder.c_str());
 
-  // Use WS2812B with GRB color order
-  FastLED.addLeds<LED_TYPE, DATA_PIN, GRB>(leds, numLeds);
-  FastLED.setBrightness(BRIGHTNESS);
-
+  // Initialize FastLED with config values
+  // Note: FastLED template requires compile-time pin, so we'll use the config value
+  // but template will still use hardcoded pin. This is a limitation of FastLED.
+  if (ledType == "WS2812B") {
+    if (colorOrder == "GRB") {
+      FastLED.addLeds<WS2812B, 8, GRB>(leds, TOTAL_LEDS);
+    } else if (colorOrder == "RGB") {
+      FastLED.addLeds<WS2812B, 8, RGB>(leds, TOTAL_LEDS);
+    } else {
+      FastLED.addLeds<WS2812B, 8, GRB>(leds, TOTAL_LEDS); // Default to GRB
+    }
+  } else {
+    // Default to WS2812B if unknown type
+    FastLED.addLeds<WS2812B, 8, GRB>(leds, TOTAL_LEDS);
+  }
+  
+  FastLED.setBrightness(brightness);
   Serial.println("LED matrix ready!");
-}
-
-// Configure panel setup
-PanelConfig createPanelConfig() {
-  PanelConfig config;
-  
-  // Matrix dimensions (2x2 panels)
-  config.matrixWidth = 2;
-  config.matrixHeight = 2;
-  
-  // Panel order - which physical panel is at each logical position
-  // Adjust these if your panels are wired in a different order
-  config.panelOrder[0] = 0;  // Top-left is physical panel 0
-  config.panelOrder[1] = 1;  // Top-right is physical panel 1
-  config.panelOrder[2] = 2;  // Bottom-left is physical panel 2
-  config.panelOrder[3] = 3;  // Bottom-right is physical panel 3
-  
-  // Panel rotation - adjust if panels are mounted rotated
-  // Valid values: 0, 90, 180, 270 (degrees)
-  config.panelRotation[0] = 0;
-  config.panelRotation[1] = 0;
-  config.panelRotation[2] = 0;
-  config.panelRotation[3] = 0;
-  
-  // Serpentine wiring - true if panel uses zigzag wiring pattern
-  // Set to false if panel uses straight row-by-row wiring
-  config.serpentine[0] = true;
-  config.serpentine[1] = true;
-  config.serpentine[2] = true;
-  config.serpentine[3] = true;
-  
-  return config;
 }
 
 void setup() {
@@ -114,11 +114,43 @@ void setup() {
   matrix.begin(config);
 
   Serial.println("LED matrix initialized successfully!");
+
+  // Register animations
+  TestPatternAnimation* testAnim = new TestPatternAnimation(&matrix);
+  RainbowAnimation* rainbowAnim = new RainbowAnimation(&matrix);
+  SolidColorAnimation* solidRed = new SolidColorAnimation(CRGB::Red);
+  animManager.registerAnimation(testAnim);
+  animManager.registerAnimation(rainbowAnim);
+  animManager.registerAnimation(solidRed);
+
+  // Optional: load frame animation from PROGMEM or FS (FS path from config)
+  if (configManager.getFsAnimationPath().length() > 0) {
+    FsFrameSource* fsSrc = new FsFrameSource(configManager.getFsAnimationPath().c_str());
+    if (fsSrc->getFrameCount() > 0) {
+      FrameAnimation* frameAnim = new FrameAnimation(fsSrc, 100);
+      animManager.registerAnimation(frameAnim);
+    } else {
+      delete fsSrc;
+    }
+  }
+
+  // Auto-cycle from config
+  animManager.setAutoCycle(configManager.getAutoCycleMs());
+
+  // Select default animation by name if provided
+  String defaultName = configManager.getDefaultAnimation();
+  if (!defaultName.isEmpty()) {
+    if (!animManager.switchToByName(defaultName.c_str())) {
+      animManager.setup();
+    }
+  } else {
+    animManager.setup();
+  }
 }
 
 void loop() {
-  // Draw animated test pattern with different modes
-  matrix.drawPanelTestPattern(leds);
+  // Drive current animation
+  animManager.loop(leds);
   FastLED.show();
-  delay(LOOP_DELAY_MS);
+
 }

@@ -26,6 +26,24 @@ PanelConfig ConfigManager::setup() {
         applyDefaults(config);
     }
     
+    // If config was loaded from file, animation and LED settings are already loaded in loadConfigFromFile()
+    // If not loaded from file, defaults are already set in applyDefaults()
+
+    // Print animation settings
+    Serial.println("\n=== Animation Settings ===");
+    Serial.printf("Default Animation: %s\n", defaultAnimationName.c_str());
+    Serial.printf("Auto Cycle: %d ms\n", defaultAutoCycleMs);
+    Serial.printf("FS Animation Path: %s\n", defaultFsAnimationPath.c_str());
+    Serial.println("=========================");
+    
+    // Print LED hardware settings
+    Serial.println("\n=== LED Hardware Settings ===");
+    Serial.printf("Data Pin: %d\n", ledDataPin);
+    Serial.printf("Brightness: %d\n", ledBrightness);
+    Serial.printf("LED Type: %s\n", ledType.c_str());
+    Serial.printf("Color Order: %s\n", ledColorOrder.c_str());
+    Serial.println("=============================");
+
     // Print final configuration
     Serial.println("\n=== Final Configuration ===");
     printConfig(config);
@@ -78,6 +96,7 @@ void ConfigManager::applyDefaults(PanelConfig& config) {
     // Apply safe default values
     Serial.println("Applying default configuration values...");
     
+    // Panel configuration defaults
     config.matrixWidth = 2;
     config.matrixHeight = 2;
     
@@ -91,6 +110,17 @@ void ConfigManager::applyDefaults(PanelConfig& config) {
     config.startCorner = 0;      // TOP_LEFT
     config.panelLayout = 0;      // HORIZONTAL
     config.panelSerpentine = false;
+    
+    // Animation defaults
+    defaultAnimationName = "TestPattern";
+    defaultAutoCycleMs = 0;
+    defaultFsAnimationPath = "/animations/example.lfx";
+    
+    // LED hardware defaults
+    ledDataPin = 8;
+    ledBrightness = 128;
+    ledType = "WS2812B";
+    ledColorOrder = "GRB";
 }
 
 bool ConfigManager::savePanelConfig(const PanelConfig& config) {
@@ -308,6 +338,37 @@ bool ConfigManager::loadConfigFromFile(const char* path, PanelConfig& config) {
         config.panelSerpentine = doc["panelSerpentine"];
     }
     
+    // Load animation settings (optional)
+    if (doc.containsKey("defaultAnimation") && doc["defaultAnimation"].is<const char*>()) {
+        defaultAnimationName = String((const char*)doc["defaultAnimation"]);
+    }
+    if (doc.containsKey("autoCycleMs")) {
+        defaultAutoCycleMs = (uint32_t)doc["autoCycleMs"].as<uint32_t>();
+    }
+    if (doc.containsKey("fsAnimationPath") && doc["fsAnimationPath"].is<const char*>()) {
+        defaultFsAnimationPath = String((const char*)doc["fsAnimationPath"]);
+    }
+    
+    // Load LED hardware settings (optional)
+    if (doc.containsKey("ledDataPin")) {
+        uint8_t pin = doc["ledDataPin"];
+        if (pin >= 0 && pin <= 48) {  // Valid GPIO range for ESP32-S3
+            ledDataPin = pin;
+        }
+    }
+    if (doc.containsKey("ledBrightness")) {
+        uint8_t brightness = doc["ledBrightness"];
+        if (brightness >= 1 && brightness <= 255) {
+            ledBrightness = brightness;
+        }
+    }
+    if (doc.containsKey("ledType") && doc["ledType"].is<const char*>()) {
+        ledType = String((const char*)doc["ledType"]);
+    }
+    if (doc.containsKey("ledColorOrder") && doc["ledColorOrder"].is<const char*>()) {
+        ledColorOrder = String((const char*)doc["ledColorOrder"]);
+    }
+
     // Final validation
     if (!validateConfig(config)) {
         Serial.println("✗ Loaded config failed validation, using defaults");
@@ -369,6 +430,17 @@ String ConfigManager::exportConfigJSON(const PanelConfig& config) {
     doc["startCorner"] = config.startCorner;
     doc["panelLayout"] = config.panelLayout;
     doc["panelSerpentine"] = config.panelSerpentine;
+    
+    // Animation settings
+    doc["defaultAnimation"] = defaultAnimationName;
+    doc["autoCycleMs"] = defaultAutoCycleMs;
+    doc["fsAnimationPath"] = defaultFsAnimationPath;
+    
+    // LED hardware settings
+    doc["ledDataPin"] = ledDataPin;
+    doc["ledBrightness"] = ledBrightness;
+    doc["ledType"] = ledType;
+    doc["ledColorOrder"] = ledColorOrder;
     
     String output;
     serializeJson(doc, output);
