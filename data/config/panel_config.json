@@ -1,0 +1,10 @@
+{
+  "matrixWidth": 2,
+  "matrixHeight": 2,
+  "panelOrder": [0, 3, 2, 1],
+  "panelRotation": [0, 0, 0, 0],
+  "serpentine": [true, true, true, true],
+  "startCorner": 0,
+  "panelLayout": 1,
+  "panelSerpentine": true
+}
