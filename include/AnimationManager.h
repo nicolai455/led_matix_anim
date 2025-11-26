@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <FastLED.h>
 #include "Animation.h"
+#include "MatrixOrientation.h"
 
 #define MAX_ANIMATIONS 16
 
@@ -15,8 +16,14 @@ private:
     unsigned long lastSwitchMs;
     uint32_t autoCycleMs; // 0 = disabled
 
+    // Frame buffer for 2D coordinate rendering
+    CRGB frameBuffer[TOTAL_SIZE][TOTAL_SIZE];
+
+    // Matrix orientation for coordinate transformation
+    MatrixOrientation* matrix;
+
 public:
-    AnimationManager();
+    AnimationManager(MatrixOrientation* matrixPtr);
 
     void setAutoCycle(uint32_t intervalMs); // 0 disables
 

@@ -1,7 +1,7 @@
 #include "AnimationManager.h"
 
-AnimationManager::AnimationManager()
-    : animationCount(0), currentIndex(-1), lastSwitchMs(0), autoCycleMs(0) {
+AnimationManager::AnimationManager(MatrixOrientation* matrixPtr)
+    : animationCount(0), currentIndex(-1), lastSwitchMs(0), autoCycleMs(0), matrix(matrixPtr) {
     for (uint8_t i = 0; i < MAX_ANIMATIONS; i++) {
         animations[i] = nullptr;
     }
@@ -51,7 +51,7 @@ void AnimationManager::setup() {
 }
 
 void AnimationManager::loop(CRGB* leds) {
-    if (animationCount == 0 || currentIndex < 0) return;
+    if (animationCount == 0 || currentIndex < 0 || !matrix) return;
 
     // Auto cycle if enabled
     if (autoCycleMs > 0) {
@@ -62,7 +62,11 @@ void AnimationManager::loop(CRGB* leds) {
         }
     }
 
-    animations[currentIndex]->loop(leds);
+    // Render animation into 2D frame buffer
+    animations[currentIndex]->renderFrame(frameBuffer, millis());
+
+    // Transform 2D logical coordinates to physical LED indices
+    matrix->render(frameBuffer, leds);
 }
 
 

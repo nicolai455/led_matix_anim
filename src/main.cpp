@@ -7,6 +7,7 @@
 #include "animations/RainbowAnimation.h"
 #include "animations/SolidColorAnimation.h"
 #include "animations/FrameAnimation.h"
+#include "animations/TextAnimation.h"
 #include "frame_io/ProgmemFrameSource.h"
 #include "frame_io/FsFrameSource.h"
 
@@ -24,7 +25,7 @@ MatrixOrientation matrix;
 ConfigManager configManager;
 
 // Animation manager
-AnimationManager animManager;
+AnimationManager animManager(&matrix);
 
 // Function to disable the onboard LED
 void disableOnboardLED() {
@@ -116,12 +117,17 @@ void setup() {
   Serial.println("LED matrix initialized successfully!");
 
   // Register animations
-  TestPatternAnimation* testAnim = new TestPatternAnimation(&matrix);
-  RainbowAnimation* rainbowAnim = new RainbowAnimation(&matrix);
+  TestPatternAnimation* testAnim = new TestPatternAnimation();
+  RainbowAnimation* rainbowAnim = new RainbowAnimation();
   SolidColorAnimation* solidRed = new SolidColorAnimation(CRGB::Red);
+  TextAnimation* staticText = new TextAnimation("HELLO", CRGB::Green, CRGB::Black, 12, true);
+  TextAnimation* scrollText = new TextAnimation("SCROLLING TEXT! ", 1, CRGB::Cyan, CRGB::Black, 12);
+
   animManager.registerAnimation(testAnim);
   animManager.registerAnimation(rainbowAnim);
   animManager.registerAnimation(solidRed);
+  animManager.registerAnimation(staticText);
+  animManager.registerAnimation(scrollText);
 
   // Optional: load frame animation from PROGMEM or FS (FS path from config)
   if (configManager.getFsAnimationPath().length() > 0) {

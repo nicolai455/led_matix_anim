@@ -11,9 +11,11 @@ private:
 public:
     explicit SolidColorAnimation(CRGB c) : color(c) {}
     void setup() override {}
-    void loop(CRGB* leds) override {
-        for (int i = 0; i < TOTAL_LEDS; i++) {
-            leds[i] = color;
+    void renderFrame(CRGB buffer[TOTAL_SIZE][TOTAL_SIZE], uint32_t frameTime) override {
+        for (uint8_t y = 0; y < TOTAL_SIZE; y++) {
+            for (uint8_t x = 0; x < TOTAL_SIZE; x++) {
+                buffer[y][x] = color;
+            }
         }
     }
     const char* getName() const override { return "Solid"; }
